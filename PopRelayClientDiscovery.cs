@@ -15,7 +15,7 @@ public class PopRelayClientDiscovery : MonoBehaviour {
 	public bool						DisableOnDiscovery = true;
 	public UnityEvent_Hostname		OnDiscoveredHost;
 
-	static string	BroadcastString = "whoisserver";
+	static string	BroadcastString = "whereisobserverserver";
 	static int		BroadcastPort = 8082;
 	UdpClient		Socket;
 	IPEndPoint		EndPoint;

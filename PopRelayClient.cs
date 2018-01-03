@@ -172,14 +172,19 @@ public class PopRelayClient : MonoBehaviour
 			};
 
 			//	gr: does this need to be a queued job?
+			//	gr: it does now, 2017 throws because of use of the events
 			NewSocket.OnMessage += (sender, e) => {
 
-				if ( e.Type == Opcode.TEXT )
-					OnTextMessage( e.Data );
-				else if ( e.Type == Opcode.BINARY )
-					OnBinaryMessage( e.RawData );
-				else
-					OnError( Host, "Unknown opcode " + e.Type, false );
+				System.Action Handler = ()=>
+				{
+					if ( e.Type == Opcode.TEXT )
+						OnTextMessage( e.Data );
+					else if ( e.Type == Opcode.BINARY )
+						OnBinaryMessage( e.RawData );
+					else
+						OnError( Host, "Unknown opcode " + e.Type, false );
+				};
+				QueueJob(Handler);
 			};
 
 			//	socket assigned upon success

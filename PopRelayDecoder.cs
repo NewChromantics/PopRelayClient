@@ -4,9 +4,7 @@ using UnityEngine;
 using UnityEngine.Events;
 
 [System.Serializable]
-public class UnityEvent_JsonAndData : UnityEvent <string,byte[]> {}
-
-
+public class UnityEvent_JsonAndDataAndEncoding : UnityEvent <string,byte[],string> {}
 
 
 [System.Serializable]
@@ -26,7 +24,7 @@ public class PopRelayDecoder : MonoBehaviour {
 	PopRelayClient	Client	{	get	{ return GetComponent<PopRelayClient> (); }}
 
 	//	gr: maybe make this a list with different encodings to handle... or stream names?
-	public UnityEvent_JsonAndData	OnDecodedPacket;
+	public UnityEvent_JsonAndDataAndEncoding	OnDecodedPacket;
 
 	void OnEnable()
 	{
@@ -44,16 +42,18 @@ public class PopRelayDecoder : MonoBehaviour {
 	{
 		string Json;
 		byte[] Data;
-		DecodePacket (Packet, out Json,out Data);
-		OnDecodedPacket.Invoke (Json, Data);
+		string Encoding;
+		DecodePacket (Packet, out Json,out Data,out Encoding);
+		OnDecodedPacket.Invoke (Json, Data, Encoding);
 	}
 
 	void HandlePacket(PopMessageBinary Packet)
 	{
 		string Json;
 		byte[] Data;
-		DecodePacket (Packet,out Json, out Data);
-		OnDecodedPacket.Invoke (Json, Data);
+		string Encoding;
+		DecodePacket (Packet,out Json, out Data,out Encoding);
+		OnDecodedPacket.Invoke (Json, Data, Encoding);
 	}
 
 	static int GetJsonLength(byte[] Data)
@@ -123,7 +123,7 @@ public class PopRelayDecoder : MonoBehaviour {
 	}
 
 	//	abstracted so this can be used on a thread
-	public static void		DecodePacket(PopMessageText PacketMsg,out string Json,out byte[] Data)
+	public static void		DecodePacket(PopMessageText PacketMsg,out string Json,out byte[] Data,out string Encoding)
 	{
 		var Packet = PacketMsg.FromJson<BasePacket> ();
 
@@ -137,20 +137,20 @@ public class PopRelayDecoder : MonoBehaviour {
 		//	peel off layers of encoding
 		while ( Packet.Encoding.Count > 1 )
 		{
-			var Encoding = Packet.Encoding [0];
+			var HeadEncoding = Packet.Encoding [0];
 			Packet.Encoding.RemoveAt (0);
 
-			if (Encoding == "Base64") {
+			if (HeadEncoding == "Base64") {
 				DataBytes = DecodeBase64(Packet.Data);
 				continue;
 			}
 
-			if (Encoding == "Hex") {
+			if (HeadEncoding == "Hex") {
 				DataBytes = DecodeHex (Packet.Data);
 				continue;
 			}
 
-			throw new System.Exception ("Don't know how to decode " + Encoding);
+			throw new System.Exception ("Don't know how to decode " + HeadEncoding);
 		}
 
 		//	if the data remaining is a string (in whatever encoding), turn it to bytes.
@@ -159,19 +159,21 @@ public class PopRelayDecoder : MonoBehaviour {
 			DataBytes = DecodeString (Packet.Data);
 		}
 
+		Encoding = Packet.Encoding[0];
 		Json = PacketMsg.Data;
 		Data = DataBytes;
 	}
 
-	public static void		DecodePacket(PopMessageBinary Packet,out string Json,out byte[] Data)
+	public static void		DecodePacket(PopMessageBinary Packet,out string Json,out byte[] Data,out string Encoding)
 	{
 		var JsonLength = GetJsonLength (Packet.Data);
 
 		var JsonBytes = new byte[JsonLength];
 		System.Array.Copy (Packet.Data, JsonBytes, JsonBytes.Length);
 		Json = System.Text.Encoding.UTF8.GetString(JsonBytes);
-		var AudioPacket = JsonUtility.FromJson<AudioPacket> (Json);
-
+		var PacketMeta = JsonUtility.FromJson<BasePacket> (Json);
+		Encoding = PacketMeta.Encoding[0];
+			
 		Data = new byte[Packet.Data.Length - JsonBytes.Length];
 		System.Array.Copy (Packet.Data, JsonBytes.Length, Data, 0, Data.Length);
 	}

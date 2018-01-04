@@ -186,7 +186,7 @@ public class PopRelayClient : MonoBehaviour
 				};
 				QueueJob(Handler);
 			};
-
+		
 			//	socket assigned upon success
     	    NewSocket.ConnectAsync ();
 		}

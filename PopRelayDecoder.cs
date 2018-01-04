@@ -56,27 +56,6 @@ public class PopRelayDecoder : MonoBehaviour {
 		OnDecodedPacket.Invoke (Json, Data, Encoding);
 	}
 
-	static int GetJsonLength(byte[] Data)
-	{
-		//	pull json off the front
-		if (Data [0] != '{')
-			throw new System.Exception ("Data is not json. Starts with " + (char)Data[0] );
-
-		var OpeningBrace = '{';
-		var ClosingBrace = '}';
-		int BraceCount = 1;
-		int i = 1;
-		while (BraceCount > 0) {
-			if (i >= Data.Length)
-				throw new System.Exception ("Json braces not balanced");
-			if (Data [i] == OpeningBrace)
-				BraceCount++;
-			if (Data [i] == ClosingBrace)
-				BraceCount--;
-			i++;
-		}
-		return i;
-	}
 
 	static byte HexCharToByte(char Char)
 	{
@@ -166,7 +145,7 @@ public class PopRelayDecoder : MonoBehaviour {
 
 	public static void		DecodePacket(PopMessageBinary Packet,out string Json,out byte[] Data,out string Encoding)
 	{
-		var JsonLength = GetJsonLength (Packet.Data);
+		var JsonLength = PopX.Json.GetJsonLength (Packet.Data);
 
 		var JsonBytes = new byte[JsonLength];
 		System.Array.Copy (Packet.Data, JsonBytes, JsonBytes.Length);

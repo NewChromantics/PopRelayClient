@@ -11,13 +11,26 @@ public class PopRelayCacheWriter : MonoBehaviour
 	[InspectorButton("ClearCache")]
 	public bool				_Clear_Cache;
 
-	public PopRelayClient	Client { get { return GetComponent<PopRelayClient>(); } }
+	public PopRelayClient	_Client;
+	public PopRelayClient	Client { get { return (_Client!=null)?_Client:GetComponent<PopRelayClient>(); } }
 	public TextAsset		Cache;
 #if UNITY_EDITOR
 	public string			Filename { get { return AssetDatabase.GetAssetPath(Cache); } }
 #else
 	public string			Filename	{	get{	return null;	}}
 #endif
+
+	void OnEnable()
+	{
+		Client.OnMessageBinary.AddListener (WriteCache);
+		Client.OnMessageText.AddListener (WriteCache);
+	}
+
+	void OnDisable()
+	{
+		Client.OnMessageBinary.RemoveListener (WriteCache);
+		Client.OnMessageText.RemoveListener (WriteCache);
+	}
 
 	public void ClearCache()
 	{
@@ -53,17 +66,28 @@ public class PopRelayCacheWriter : MonoBehaviour
 
 		var TailDataSize = Packet.Data.Length - JsonLength;
 		Debug.Log("Binary packet has " + TailDataSize + " data");
+
+		//	all json, just treat it as text
 		if (TailDataSize == 0)
 		{
-			var Json = System.Text.Encoding.UTF8.GetString(Packet.Data);
-			WriteCache(Json);
+			var DataString = System.Text.Encoding.UTF8.GetString(Packet.Data);
+			WriteCache(DataString);
 			return;
 		}
 
 		//	grab tail data, encode to base 64.
 		//	update encoding and inject into json
+		string Json;
+		byte[] Data;
+		PopRelayEncoding Encoding;
+		PopRelayDecoder.DecodePacket( Packet, out Json, out Data, out Encoding );
 
-		//PopRelayDecoder.DecodePacket( Packet, Json, Data, out string Encoding)
+		//	encode to base 64
+		var Data64 = System.Convert.ToBase64String (Data);
+		Encoding.Push(PopRelayEncoding.Type.Base64);
+		PopX.Json.Replace (ref Json, "Encoding", Encoding.GetString());
+		//Json = PopX.Json.Insert (Json, "Data", Data64);
+
 
 	}
 

@@ -4,22 +4,81 @@ using UnityEngine;
 using UnityEngine.Events;
 
 [System.Serializable]
-public class UnityEvent_JsonAndDataAndEncoding : UnityEvent <string,byte[],string> {}
+public class UnityEvent_JsonAndDataAndEncoding : UnityEvent <string,byte[],PopRelayEncoding> {}
 
 
 [System.Serializable]
 public class BasePacket
 {
 	public int			Timecode;
-	public List<string>	Encoding;
+	public string		Encoding;
 	public string		Data;
 	public string		Stream;
+
+	public PopRelayEncoding	GetEncoding()	
+	{
+		return new PopRelayEncoding (Encoding);
+	}
 };
 
+//	make this serialisable!
+public class PopRelayEncoding
+{
+	//	known encoding formats, but we allow arbtritry ones
+	//	string enum - consider this instead (attribute associated with value) https://stackoverflow.com/a/8588476/355753
+	public static class Type
+	{
+		public const string 
+		Pcm8 = "Pcm8",
+		Pcm16 = "Pcm16",
+		Hex = "Hex",
+		Base64 = "Base64",
+		OggVorbis = "OggVorbis";
+	};
 
+	const char			Seperator = '/';	//	make sure this doesn't intefere with json or other encodings
+	const string		SeperatorString = "/";
+	static char[] 		SeperatorArray	{	get{	return new char[]{Seperator};}	}	//	get rid of this alloc!
+
+	public int			Count			{	get{return Types.Count;}}
+	List<string>		Types;
+
+	public PopRelayEncoding(string Encoding)
+	{
+		Types = new List<string> (Encoding.Split (SeperatorArray));
+	}
+
+	public string		GetString()
+	{
+		return string.Join (SeperatorString, Types.ToArray ());
+	}
+
+	public void			Push(string Type)	
+	{
+		Types.Insert (0, Type);
+	}
+
+	public string		Peek()
+	{
+		return Types [0];
+	}
+
+	public string		FinalEncoding()
+	{
+		return Types [Types.Count - 1];
+	}
+
+	public string		Pop()
+	{
+		var Head = Types[0];
+		Types.RemoveAt (0);
+		return Head;
+	}
+}
 
 [RequireComponent(typeof(PopRelayClient))]
 public class PopRelayDecoder : MonoBehaviour {
+		
 
 	PopRelayClient	Client	{	get	{ return GetComponent<PopRelayClient> (); }}
 
@@ -42,7 +101,7 @@ public class PopRelayDecoder : MonoBehaviour {
 	{
 		string Json;
 		byte[] Data;
-		string Encoding;
+		PopRelayEncoding Encoding;
 		DecodePacket (Packet, out Json,out Data,out Encoding);
 		OnDecodedPacket.Invoke (Json, Data, Encoding);
 	}
@@ -51,7 +110,7 @@ public class PopRelayDecoder : MonoBehaviour {
 	{
 		string Json;
 		byte[] Data;
-		string Encoding;
+		PopRelayEncoding Encoding;
 		DecodePacket (Packet,out Json, out Data,out Encoding);
 		OnDecodedPacket.Invoke (Json, Data, Encoding);
 	}
@@ -102,22 +161,18 @@ public class PopRelayDecoder : MonoBehaviour {
 	}
 
 	//	abstracted so this can be used on a thread
-	public static void		DecodePacket(PopMessageText PacketMsg,out string Json,out byte[] Data,out string Encoding)
+	public static void		DecodePacket(PopMessageText PacketMsg,out string Json,out byte[] Data,out PopRelayEncoding Encoding)
 	{
 		var Packet = PacketMsg.FromJson<BasePacket> ();
-
-		if ( Packet.Encoding == null )
-			Packet.Encoding = new List<string>( new string[]{"?"} );
-
 
 		//	if we've decoded from string to binary, it's here, otherwise in the packet
 		byte[] DataBytes = null;
 
 		//	peel off layers of encoding
-		while ( Packet.Encoding.Count > 1 )
+		Encoding = Packet.GetEncoding();
+		while ( Encoding.Count > 1 )
 		{
-			var HeadEncoding = Packet.Encoding [0];
-			Packet.Encoding.RemoveAt (0);
+			var HeadEncoding = Encoding.Pop ();
 
 			if (HeadEncoding == "Base64") {
 				DataBytes = DecodeBase64(Packet.Data);
@@ -138,12 +193,11 @@ public class PopRelayDecoder : MonoBehaviour {
 			DataBytes = DecodeString (Packet.Data);
 		}
 
-		Encoding = Packet.Encoding[0];
 		Json = PacketMsg.Data;
 		Data = DataBytes;
 	}
 
-	public static void		DecodePacket(PopMessageBinary Packet,out string Json,out byte[] Data,out string Encoding)
+	public static void		DecodePacket(PopMessageBinary Packet,out string Json,out byte[] Data,out PopRelayEncoding Encoding)
 	{
 		var JsonLength = PopX.Json.GetJsonLength (Packet.Data);
 
@@ -151,7 +205,7 @@ public class PopRelayDecoder : MonoBehaviour {
 		System.Array.Copy (Packet.Data, JsonBytes, JsonBytes.Length);
 		Json = System.Text.Encoding.UTF8.GetString(JsonBytes);
 		var PacketMeta = JsonUtility.FromJson<BasePacket> (Json);
-		Encoding = PacketMeta.Encoding[0];
+		Encoding = PacketMeta.GetEncoding ();
 			
 		Data = new byte[Packet.Data.Length - JsonBytes.Length];
 		System.Array.Copy (Packet.Data, JsonBytes.Length, Data, 0, Data.Length);

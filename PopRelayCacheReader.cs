@@ -24,10 +24,12 @@ public class RepeatActionTimer
 
 }
 
-[RequireComponent(typeof(PopRelayClient))]
+
+
 public class PopRelayCacheReader : MonoBehaviour
 {
-	public PopRelayClient		Client { get { return GetComponent<PopRelayClient>(); } }
+	public PopRelayClient		_Client;
+	public PopRelayClient		Client { get { return (_Client!=null)?_Client:GetComponent<PopRelayClient>(); } }
 	public TextAsset			Cache;
 	public RepeatActionTimer	Timer;
 
@@ -40,9 +42,17 @@ public class PopRelayCacheReader : MonoBehaviour
 		if (CacheData == null)
 			CacheData = Cache.text;
 
-		//	find next json chunk
-		//	todo: eat whitespace
-		var JsonLength = PopX.Json.GetJsonLength(CacheData);
+		int JsonLength = 0;
+		try
+		{
+			//	find next json chunk
+			JsonLength = PopX.Json.GetJsonLength(CacheData);
+		}
+		catch(System.Exception e) {
+			//	eof
+			return;
+		}
+
 		var Json = CacheData.Substring(0, JsonLength);
 		CacheData = CacheData.Substring(JsonLength);
 

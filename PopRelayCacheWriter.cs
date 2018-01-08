@@ -86,9 +86,8 @@ public class PopRelayCacheWriter : MonoBehaviour
 		var Data64 = System.Convert.ToBase64String (Data);
 		Encoding.Push(PopRelayEncoding.Type.Base64);
 		PopX.Json.Replace (ref Json, "Encoding", Encoding.GetString());
-		//Json = PopX.Json.Insert (Json, "Data", Data64);
-
-
+		PopX.Json.Append (ref Json, "Data", Data64);
+		WriteCache (Json);
 	}
 
 }

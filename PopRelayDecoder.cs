@@ -33,7 +33,9 @@ public class PopRelayEncoding
 		Pcm16 = "Pcm16",
 		Hex = "Hex",
 		Base64 = "Base64",
-		OggVorbis = "OggVorbis";
+		OggVorbis = "OggVorbis",
+		Jpeg = "Jpeg",
+		Png = "Png";
 	};
 
 	const char			Seperator = '/';	//	make sure this doesn't intefere with json or other encodings

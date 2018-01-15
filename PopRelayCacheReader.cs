@@ -36,6 +36,7 @@ public class PopRelayCacheReader : MonoBehaviour
 	//	gr: realised a long time ago that the TextAsset reads from disk everytime bytes/string is accessed...
 	//	so cache and eat data as we go
 	string						CacheData;
+	int							CachePosition = 0;	//	mega expensive to rewrite the cache string, so search in-place
 
 	public void PopNextPacket()
 	{
@@ -46,15 +47,18 @@ public class PopRelayCacheReader : MonoBehaviour
 		try
 		{
 			//	find next json chunk
-			JsonLength = PopX.Json.GetJsonLength(CacheData);
+			JsonLength = PopX.Json.GetJsonLength(CacheData,CachePosition);
 		}
 		catch(System.Exception e) {
 			//	eof
+			Debug.LogError ("Stopping parsing of " + this.name + " after exception: " + e.Message);
+			//Debug.LogException(e);
+			this.enabled = false;
 			return;
 		}
 
-		var Json = CacheData.Substring(0, JsonLength);
-		CacheData = CacheData.Substring(JsonLength);
+		var Json = CacheData.Substring(CachePosition, JsonLength);
+		CachePosition += JsonLength;
 
 		//	turn it into a packet
 		var Packet = new PopMessageText(Json);

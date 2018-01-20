@@ -62,6 +62,10 @@ public class PopRelayClient : MonoBehaviour
 	public UnityEvent_PopMessageBinary	OnMessageBinary;
 	public UnityEvent_PopMessageText	OnMessageText;
 
+	//	move these jobs to a thread!
+	[Range(1,5000)]
+	public int							MaxJobsPerFrame = 1000;
+
 	public enum Role
 	{
 		God = 8081,
@@ -221,7 +225,8 @@ public class PopRelayClient : MonoBehaviour
 	
 		//	commands to execute from other thread
 		if (JobQueue != null) {
-			while (JobQueue.Count > 0) {
+			var JobsExecutedCount = 0;
+			while (JobQueue.Count > 0 && JobsExecutedCount++ < MaxJobsPerFrame ) {
 
 				if ( DebugUpdate )
 					Debug.Log("Executing job 0/" + JobQueue.Count);
@@ -237,6 +242,10 @@ public class PopRelayClient : MonoBehaviour
 				{
 					Debug.Log("Job invoke exception: " + e.Message );
 				}
+			}
+
+			if (JobQueue.Count>0) {
+				Debug.LogWarning("Executed " + JobsExecutedCount + " this frame, " + JobQueue.Count + " jobs remaining");
 			}
 		}
 

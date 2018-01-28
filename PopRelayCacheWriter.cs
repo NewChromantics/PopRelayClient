@@ -20,16 +20,110 @@ public class PopRelayCacheWriter : MonoBehaviour
 	public string			Filename	{	get{	return null;	}}
 #endif
 
+	List<string>			WriteQueue_String;
+	List<PopMessageBinary>	WriteQueue_Binary;
+	System.Threading.WaitCallback		ExecuteThread;
+
+	[Range(0,1000)]
+	public int				WritesPerFrame = 1;
+
+	[ShowFunctionResult("GetQueueSize")]
+	public bool				Something = true;
+
+	public int				GetQueueSize()
+	{
+		Pop.AllocIfNull (ref WriteQueue_String);
+		Pop.AllocIfNull (ref WriteQueue_Binary);
+		return WriteQueue_String.Count + WriteQueue_Binary.Count;
+	}
+
+	void PopQueue<T>(ref List<T> ItemQueue,System.Action<T> RunItem)
+	{
+		Pop.AllocIfNull( ref ItemQueue );
+		if ( ItemQueue.Count == 0 )
+			return;
+
+		//	pop header of queue
+		T Item = default(T);
+		lock( ItemQueue )
+		{
+			Item = ItemQueue[0];
+			ItemQueue.RemoveAt (0);
+		}
+			
+		RunItem.Invoke (Item);			
+	}
+
+
+	void ProcessQueues()
+	{
+		System.Action<PopMessageBinary> EncodeAndQueue = (Packet) => {
+			var Encoded = EncodeToText( Packet );
+			QueueWrite( Encoded );
+		};
+		
+		PopQueue (ref WriteQueue_Binary, EncodeAndQueue);
+		PopQueue (ref WriteQueue_String, WriteToFile );
+	}
+
+
+	void QueueWrite(PopMessageBinary Packet)
+	{
+		Pop.AllocIfNull (ref WriteQueue_Binary);
+		lock (WriteQueue_Binary) {
+			WriteQueue_Binary.Add (Packet);
+		};
+		OnQueueChanged ();
+	}
+
+	void QueueWrite(PopMessageText Packet)
+	{
+		QueueWrite(Packet.Data);
+	}
+
+	void QueueWrite(string Packet)
+	{
+		Pop.AllocIfNull (ref WriteQueue_String);
+		lock (WriteQueue_String) {
+			WriteQueue_String.Add (Packet);
+		};
+		OnQueueChanged ();
+	}
+
+	void OnQueueChanged()
+	{
+		EditorUtility.SetDirty (this);
+		/*
+		if ( ExecuteThread != null )
+			return;
+
+		ExecuteThread = (State) => {
+			ExecuteQueue ();
+			ExecuteThread = null;
+		};
+		System.Threading.ThreadPool.QueueUserWorkItem (ExecuteThread);
+		*/
+	}
+
+
 	void OnEnable()
 	{
-		Client.OnMessageBinary.AddListener (WriteCache);
-		Client.OnMessageText.AddListener (WriteCache);
+		Client.OnMessageBinary.AddListener (QueueWrite);
+		Client.OnMessageText.AddListener (QueueWrite);
 	}
 
 	void OnDisable()
 	{
-		Client.OnMessageBinary.RemoveListener (WriteCache);
-		Client.OnMessageText.RemoveListener (WriteCache);
+		Client.OnMessageBinary.RemoveListener (QueueWrite);
+		Client.OnMessageText.RemoveListener (QueueWrite);
+	}
+
+	void Update()
+	{
+		for ( int i=0;	i<WritesPerFrame;	i++ )
+		{
+			ProcessQueues ();
+		}
 	}
 
 	public void ClearCache()
@@ -37,7 +131,7 @@ public class PopRelayCacheWriter : MonoBehaviour
 		System.IO.File.WriteAllText( Filename, "" );
 	}
 
-	void WriteCache(string Packet)
+	void WriteToFile(string Packet)
 	{
 		var OpeningBrace = '{';
 		var ClosingBrace = '}';
@@ -54,12 +148,8 @@ public class PopRelayCacheWriter : MonoBehaviour
 		System.IO.File.AppendAllText(Filename, "\n\n\n");
 	}
 
-	public void WriteCache(PopMessageText Packet)
-	{
-		System.IO.File.AppendAllText(Filename, Packet.Data);
-	}
 
-	public void WriteCache(PopMessageBinary Packet)
+	string EncodeToText(PopMessageBinary Packet)
 	{
 		//	see if we need to grab the data from the tail of the packet and re-encode it
 		var JsonLength = PopX.Json.GetJsonLength(Packet.Data);
@@ -71,8 +161,7 @@ public class PopRelayCacheWriter : MonoBehaviour
 		if (TailDataSize == 0)
 		{
 			var DataString = System.Text.Encoding.UTF8.GetString(Packet.Data);
-			WriteCache(DataString);
-			return;
+			return DataString;
 		}
 
 		//	grab tail data, encode to base 64.
@@ -87,7 +176,7 @@ public class PopRelayCacheWriter : MonoBehaviour
 		Encoding.Push(PopRelayEncoding.Type.Base64);
 		PopX.Json.Replace (ref Json, "Encoding", Encoding.GetString());
 		PopX.Json.Append (ref Json, "Data", Data64);
-		WriteCache (Json);
+		return Json;
 	}
 
 }

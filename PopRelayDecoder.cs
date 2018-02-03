@@ -21,6 +21,15 @@ public class BasePacket
 	}
 };
 
+[System.Serializable]
+public class ImagePacket : BasePacket
+{
+	public int Width;
+	public int Height;
+};
+
+
+
 //	make this serialisable!
 public class PopRelayEncoding
 {
@@ -35,7 +44,8 @@ public class PopRelayEncoding
 		Base64 = "Base64",
 		OggVorbis = "OggVorbis",
 		Jpeg = "Jpeg",
-		Png = "Png";
+		Png = "Png",
+		Rgba = "Rgba";
 	};
 
 	const char			Seperator = '/';	//	make sure this doesn't intefere with json or other encodings
@@ -135,7 +145,7 @@ public class PopRelayDecoder : MonoBehaviour {
 		return (byte)b;
 	}
 
-	static byte[] DecodeString(string SomeString)
+	static public byte[] DecodeString(string SomeString)
 	{
 		//	gr: Not sure webapi string is UTF-8 or ascii!
 		return System.Text.Encoding.UTF8.GetBytes(SomeString);

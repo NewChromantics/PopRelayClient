@@ -253,14 +253,14 @@ public class PopRelayClient : MonoBehaviour
 
 
 
-	void OnTextMessage(string Message)
+	public void OnTextMessage(string Message)
 	{
 		//Debug_Log ("Text message: " + Message.Substring (0, 40));
 		var Msg = new PopMessageText (Message);
 		OnMessageText.Invoke (Msg);
 	}
 
-	void OnBinaryMessage(byte[] Message){
+	public void OnBinaryMessage(byte[] Message){
 		//Debug_Log ("Binary Message: " + Message.Length + " bytes");
 		var Msg = new PopMessageBinary (Message);
 		OnMessageBinary.Invoke (Msg);

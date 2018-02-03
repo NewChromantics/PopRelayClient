@@ -21,20 +21,24 @@ public class PopRelayCacheWriter : MonoBehaviour
 #endif
 
 	List<string>			WriteQueue_String;
+	List<byte[]>			WriteQueue_Bytes;
 	List<PopMessageBinary>	WriteQueue_Binary;
 	System.Threading.WaitCallback		ExecuteThread;
 
 	[Range(0,1000)]
 	public int				WritesPerFrame = 1;
 
-	[ShowFunctionResult("GetQueueSize")]
+	public bool				WriteOnlyText = true;
+
+	[ShowFunctionResult("GetQueueSize",10)]
 	public bool				Something = true;
 
 	public int				GetQueueSize()
 	{
 		Pop.AllocIfNull (ref WriteQueue_String);
-		Pop.AllocIfNull (ref WriteQueue_Binary);
-		return WriteQueue_String.Count + WriteQueue_Binary.Count;
+		Pop.AllocIfNull(ref WriteQueue_Bytes);
+		Pop.AllocIfNull(ref WriteQueue_Binary);
+		return WriteQueue_String.Count + WriteQueue_Bytes.Count + WriteQueue_Binary.Count;
 	}
 
 	void PopQueue<T>(ref List<T> ItemQueue,System.Action<T> RunItem)
@@ -58,12 +62,20 @@ public class PopRelayCacheWriter : MonoBehaviour
 	void ProcessQueues()
 	{
 		System.Action<PopMessageBinary> EncodeAndQueue = (Packet) => {
-			var Encoded = EncodeToText( Packet );
-			QueueWrite( Encoded );
+			if (WriteOnlyText)
+			{
+				var Encoded = EncodeToText(Packet);
+				QueueWrite(Encoded);
+			}
+			else
+			{
+				QueueWrite(Packet.Data);
+			}
 		};
 		
 		PopQueue (ref WriteQueue_Binary, EncodeAndQueue);
-		PopQueue (ref WriteQueue_String, WriteToFile );
+		PopQueue(ref WriteQueue_Bytes, WriteToFile);
+		PopQueue(ref WriteQueue_String, WriteToFile);
 	}
 
 
@@ -88,6 +100,17 @@ public class PopRelayCacheWriter : MonoBehaviour
 			WriteQueue_String.Add (Packet);
 		};
 		OnQueueChanged ();
+	}
+
+
+	void QueueWrite(byte[] Packet)
+	{
+		Pop.AllocIfNull(ref WriteQueue_Bytes);
+		lock (WriteQueue_Bytes)
+		{
+			WriteQueue_Bytes.Add(Packet);
+		};
+		OnQueueChanged();
 	}
 
 	void OnQueueChanged()
@@ -148,6 +171,29 @@ public class PopRelayCacheWriter : MonoBehaviour
 		System.IO.File.AppendAllText(Filename, "\n\n\n");
 	}
 
+	void WriteToFile(byte[] Packet)
+	{
+		//	gr: should still have some json I think...
+		/*
+		var OpeningBrace = '{';
+		var ClosingBrace = '}';
+
+		//	do some json verication 
+		if (Packet[0] != OpeningBrace)
+			throw new System.Exception("Expecting JSON opening brace for cache");
+		if (Packet[Packet.Length - 1] != ClosingBrace)
+			throw new System.Exception("Expecting JSON closing brace for cache");
+*/
+		//	https://stackoverflow.com/a/6862460/355753
+		using (var stream = new System.IO.FileStream(Filename, System.IO.FileMode.Append))
+		{
+			stream.Write(Packet, 0, Packet.Length);
+		}
+/*
+		//	for readability
+		System.IO.File.AppendAllText(Filename, "\n\n\n");
+		*/
+	}
 
 	string EncodeToText(PopMessageBinary Packet)
 	{

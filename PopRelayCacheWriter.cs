@@ -6,13 +6,23 @@ using UnityEngine;
 using UnityEditor;
 #endif
 
+public class JsonAndData
+{
+	public string Json;
+	public byte[] Data;
+};
+
+
 public class PopRelayCacheWriter : MonoBehaviour
 {
 	[InspectorButton("ClearCache")]
 	public bool				_Clear_Cache;
 
 	public PopRelayClient	_Client;
-	public PopRelayClient	Client { get { return (_Client!=null)?_Client:GetComponent<PopRelayClient>(); } }
+	public PopRelayClient	Client { get { return (_Client != null) ? _Client : GetComponent<PopRelayClient>(); } }
+	public PopRelayDecoder	ClientDecoder { get { return Client.GetComponent<PopRelayDecoder>();}}
+
+
 	public TextAsset		Cache;
 #if UNITY_EDITOR
 	public string			Filename { get { return AssetDatabase.GetAssetPath(Cache); } }
@@ -20,6 +30,7 @@ public class PopRelayCacheWriter : MonoBehaviour
 	public string			Filename	{	get{	return null;	}}
 #endif
 
+	List<JsonAndData>		WriteQueue_JsonAndData;
 	List<string>			WriteQueue_String;
 	List<byte[]>			WriteQueue_Bytes;
 	List<PopMessageBinary>	WriteQueue_Binary;
@@ -35,7 +46,8 @@ public class PopRelayCacheWriter : MonoBehaviour
 
 	public int				GetQueueSize()
 	{
-		Pop.AllocIfNull (ref WriteQueue_String);
+		Pop.AllocIfNull(ref WriteQueue_JsonAndData);
+		Pop.AllocIfNull(ref WriteQueue_String);
 		Pop.AllocIfNull(ref WriteQueue_Bytes);
 		Pop.AllocIfNull(ref WriteQueue_Binary);
 		return WriteQueue_String.Count + WriteQueue_Bytes.Count + WriteQueue_Binary.Count;
@@ -58,26 +70,63 @@ public class PopRelayCacheWriter : MonoBehaviour
 		RunItem.Invoke (Item);			
 	}
 
+	void EncodeAndQueue(PopMessageBinary Packet)
+	{
+		if (WriteOnlyText)
+		{
+			var Encoded = EncodeToText(Packet);
+			QueueWrite(Encoded);
+		}
+		else
+		{
+			QueueWrite(Packet.Data);
+		}
+	}
+
+	void EncodeAndQueue(JsonAndData Packet)
+	{
+		//	if data is RGBA encode to jpeg!
+		var PacketMeta = JsonUtility.FromJson<ImagePacket>(Packet.Json);
+		if ( PacketMeta.Encoding == PopRelayEncoding.Type.Rgba )
+		{
+			try
+			{
+				var Texture = new Texture2D(PacketMeta.Width, PacketMeta.Height, TextureFormat.RGBA32, false);
+				Texture.LoadRawTextureData(Packet.Data);
+				Packet.Data = Texture.EncodeToJPG(99);
+				PopX.Json.Replace( ref Packet.Json, "Encoding", PopRelayEncoding.Type.Jpeg );
+			}
+			catch(System.Exception e)
+			{
+				Debug.LogException(e);
+				return;
+			}
+		}
+
+		WriteToFile(Packet);
+	}
 
 	void ProcessQueues()
 	{
-		System.Action<PopMessageBinary> EncodeAndQueue = (Packet) => {
-			if (WriteOnlyText)
-			{
-				var Encoded = EncodeToText(Packet);
-				QueueWrite(Encoded);
-			}
-			else
-			{
-				QueueWrite(Packet.Data);
-			}
-		};
-		
+		PopQueue(ref WriteQueue_JsonAndData, EncodeAndQueue);
 		PopQueue (ref WriteQueue_Binary, EncodeAndQueue);
 		PopQueue(ref WriteQueue_Bytes, WriteToFile);
 		PopQueue(ref WriteQueue_String, WriteToFile);
 	}
 
+	void QueueWrite(string Json,byte[] Data,PopRelayEncoding Encoding)
+	{
+		var JsonAndDataStruct = new JsonAndData();
+		JsonAndDataStruct.Json = Json;
+		JsonAndDataStruct.Data = Data;
+
+		Pop.AllocIfNull(ref WriteQueue_JsonAndData);
+		lock (WriteQueue_Binary)
+		{
+			WriteQueue_JsonAndData.Add(JsonAndDataStruct);
+		};
+		OnQueueChanged();
+	}
 
 	void QueueWrite(PopMessageBinary Packet)
 	{
@@ -113,6 +162,7 @@ public class PopRelayCacheWriter : MonoBehaviour
 		OnQueueChanged();
 	}
 
+
 	void OnQueueChanged()
 	{
 		EditorUtility.SetDirty (this);
@@ -131,14 +181,12 @@ public class PopRelayCacheWriter : MonoBehaviour
 
 	void OnEnable()
 	{
-		Client.OnMessageBinary.AddListener (QueueWrite);
-		Client.OnMessageText.AddListener (QueueWrite);
+		ClientDecoder.OnDecodedPacket.AddListener (QueueWrite);
 	}
 
 	void OnDisable()
 	{
-		Client.OnMessageBinary.RemoveListener (QueueWrite);
-		Client.OnMessageText.RemoveListener (QueueWrite);
+		ClientDecoder.OnDecodedPacket.RemoveListener (QueueWrite);
 	}
 
 	void Update()
@@ -152,6 +200,12 @@ public class PopRelayCacheWriter : MonoBehaviour
 	public void ClearCache()
 	{
 		System.IO.File.WriteAllText( Filename, "" );
+	}
+
+	void WriteToFile(JsonAndData Packet)
+	{
+		WriteToFile(Packet.Json);
+		WriteToFile(Packet.Data);
 	}
 
 	void WriteToFile(string Packet)
@@ -168,7 +222,8 @@ public class PopRelayCacheWriter : MonoBehaviour
 		System.IO.File.AppendAllText(Filename, Packet);
 
 		//	for readability
-		System.IO.File.AppendAllText(Filename, "\n\n\n");
+		if ( WriteOnlyText )
+			System.IO.File.AppendAllText(Filename, "\n\n\n");
 	}
 
 	void WriteToFile(byte[] Packet)

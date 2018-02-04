@@ -33,15 +33,82 @@ public class PopRelayCacheReader : MonoBehaviour
 	public TextAsset			Cache;
 	public RepeatActionTimer	Timer;
 
+	public bool					Loop = false;
+
 	//	gr: realised a long time ago that the TextAsset reads from disk everytime bytes/string is accessed...
 	//	so cache and eat data as we go
-	string						CacheData;
+	byte[]						CacheData;
 	int							CachePosition = 0;	//	mega expensive to rewrite the cache string, so search in-place
+
+	//	returns null if we don't consider the following data binary
+	int? GetBinaryLength(int StartPosition)
+	{
+		int NonBinaryCheckCount = 6;
+		int? NextBrace = null;
+		var JsonOpening = new byte[] { (byte)'{', (byte)'"' };
+		var AllWhitespace = true;
+
+		var TestNext = new char[NonBinaryCheckCount];
+		var ResultNext = new bool[NonBinaryCheckCount];
+				
+		for (int i = StartPosition; i < CacheData.Length-NonBinaryCheckCount; i++)
+		{
+			AllWhitespace = AllWhitespace && PopX.Json.IsWhiteSpace((char)CacheData[i]);
+			var OpeningMatch = true;
+			for (int v = 0; v<JsonOpening.Length; v++)
+				OpeningMatch = OpeningMatch && (CacheData[i+v] == JsonOpening[v] );
+				
+			if (OpeningMatch)
+			{
+				bool IsValidAscii = true;
+
+				for (int v = 0; IsValidAscii && v < NonBinaryCheckCount; v++)
+				{
+					//	if the next character is not valid json ascii, we're going to assume its more binary and just happens to be a brace
+					var TestChar = (char)CacheData[i + v + 1];
+					TestNext[v] = TestChar;
+					ResultNext[v] = PopX.Json.IsValidJsonAscii(TestChar);
+					IsValidAscii = IsValidAscii && ResultNext[v];
+				}
+
+				//	this isnt json, keep looking for it
+				if (!IsValidAscii)
+					continue;
+
+				var DebugString = "Found next chunk of json: ";
+				foreach (var Char in TestNext)
+					DebugString += Char;
+				//Debug.Log(DebugString);
+				NextBrace = i;
+				break;
+			}
+		}
+
+		//	if all whitespace, ignore it
+		if (AllWhitespace)
+			return null;
+
+		if (!NextBrace.HasValue)
+			return null;
+
+		var Length = NextBrace.Value - StartPosition;
+		return Length;
+	}
 
 	public void PopNextPacket()
 	{
 		if (CacheData == null)
-			CacheData = Cache.text;
+			CacheData = Cache.bytes;
+
+		//	out of data, disable
+		if ( CachePosition >= CacheData.Length )
+		{
+			if (Loop)
+				CachePosition = 0;
+			else
+				this.enabled = false;
+			return;
+		}
 
 		int JsonLength = 0;
 		try
@@ -57,7 +124,28 @@ public class PopRelayCacheReader : MonoBehaviour
 			return;
 		}
 
-		var Json = CacheData.Substring(CachePosition, JsonLength);
+		//	look to see if there's some binary data afterwards
+		var BinaryLength = GetBinaryLength(CachePosition + JsonLength);
+		byte[] PacketData = null;
+
+		if ( BinaryLength.HasValue )
+		{
+			PacketData = new byte[JsonLength + BinaryLength.Value];
+			System.Array.Copy(CacheData, CachePosition, PacketData, 0, PacketData.Length);
+
+			CachePosition += PacketData.Length;
+
+			var BinaryPacket = new PopMessageBinary(PacketData);
+			Client.OnMessageBinary.Invoke(BinaryPacket);
+			return;
+		}
+
+		//	extract json string
+		PacketData = new byte[JsonLength];
+		System.Array.Copy(CacheData, CachePosition, PacketData, 0, PacketData.Length);
+
+		var Json = System.Text.Encoding.UTF8.GetString(PacketData);
+		//CacheData.Substring(CachePosition, JsonLength);
 		CachePosition += JsonLength;
 
 		//	turn it into a packet

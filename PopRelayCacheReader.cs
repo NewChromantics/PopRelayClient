@@ -29,7 +29,7 @@ public class RepeatActionTimer
 public class PopRelayCacheReader : MonoBehaviour
 {
 	public PopRelayClient		_Client;
-	public PopRelayClient		Client { get { return (_Client!=null)?_Client:GetComponent<PopRelayClient>(); } }
+	public PopRelayClient		Client { get { return (_Client!=null)?_Client:GameObject.FindObjectOfType<PopRelayClient>(); } }
 	public TextAsset			Cache;
 	public RepeatActionTimer	Timer;
 
@@ -45,19 +45,30 @@ public class PopRelayCacheReader : MonoBehaviour
 	{
 		int NonBinaryCheckCount = 6;
 		int? NextBrace = null;
-		var JsonOpening = new byte[] { (byte)'{', (byte)'"' };
 		var AllWhitespace = true;
 
+		//	gr: this needs to cope with prettier json
+		var JsonOpening = new byte[] { (byte)'{', (byte)'"' };
+			
+		//	to make debugging easier, get results, THEN check
 		var TestNext = new char[NonBinaryCheckCount];
 		var ResultNext = new bool[NonBinaryCheckCount];
 				
 		for (int i = StartPosition; i < CacheData.Length-NonBinaryCheckCount; i++)
 		{
-			AllWhitespace = AllWhitespace && PopX.Json.IsWhiteSpace((char)CacheData[i]);
 			var OpeningMatch = true;
 			for (int v = 0; v<JsonOpening.Length; v++)
 				OpeningMatch = OpeningMatch && (CacheData[i+v] == JsonOpening[v] );
-				
+
+			//	if we just hit an opening match, AND it's all been whitespace,($NonBinaryCheckCount chars) then probably filler between json, so bail out
+			//	if we check whitespace first, { will turn this chunk into "non whitespace"
+			if (OpeningMatch && AllWhitespace)
+				break;
+
+			//AllWhitespace = AllWhitespace && PopX.Json.IsWhiteSpace((char)CacheData[i]);
+			if (!PopX.Json.IsWhiteSpace((char)CacheData[i]))
+				AllWhitespace = false;
+
 			if (OpeningMatch)
 			{
 				bool IsValidAscii = true;

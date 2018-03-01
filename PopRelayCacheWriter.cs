@@ -128,7 +128,7 @@ public class PopRelayCacheWriter : MonoBehaviour
 		OnQueueChanged();
 	}
 
-	void QueueWrite(PopMessageBinary Packet)
+	public void QueueWrite(PopMessageBinary Packet)
 	{
 		Pop.AllocIfNull (ref WriteQueue_Binary);
 		lock (WriteQueue_Binary) {
@@ -137,12 +137,12 @@ public class PopRelayCacheWriter : MonoBehaviour
 		OnQueueChanged ();
 	}
 
-	void QueueWrite(PopMessageText Packet)
+	public void QueueWrite(PopMessageText Packet)
 	{
 		QueueWrite(Packet.Data);
 	}
 
-	void QueueWrite(string Packet)
+	public void QueueWrite(string Packet)
 	{
 		Pop.AllocIfNull (ref WriteQueue_String);
 		lock (WriteQueue_String) {
@@ -152,7 +152,7 @@ public class PopRelayCacheWriter : MonoBehaviour
 	}
 
 
-	void QueueWrite(byte[] Packet)
+	public void QueueWrite(byte[] Packet)
 	{
 		Pop.AllocIfNull(ref WriteQueue_Bytes);
 		lock (WriteQueue_Bytes)
@@ -160,6 +160,12 @@ public class PopRelayCacheWriter : MonoBehaviour
 			WriteQueue_Bytes.Add(Packet);
 		};
 		OnQueueChanged();
+	}
+
+	public void QueueWrite<T>(T Packet)
+	{
+		var Json = JsonUtility.ToJson(Packet);
+		QueueWrite(Json);
 	}
 
 

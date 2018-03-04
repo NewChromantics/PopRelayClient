@@ -22,6 +22,8 @@ public class PopRelayCacheWriter : MonoBehaviour
 	public PopRelayClient	Client { get { return (_Client != null) ? _Client : GetComponent<PopRelayClient>(); } }
 	public PopRelayDecoder	ClientDecoder { get { return Client.GetComponent<PopRelayDecoder>();}}
 
+	public bool				ClearOnFirstWrite = false;
+	bool					FirstWrite = true;
 
 	public TextAsset		Cache;
 #if UNITY_EDITOR
@@ -187,6 +189,7 @@ public class PopRelayCacheWriter : MonoBehaviour
 
 	void OnEnable()
 	{
+		FirstWrite = true;
 		ClientDecoder.OnDecodedPacket.AddListener (QueueWrite);
 	}
 
@@ -216,6 +219,12 @@ public class PopRelayCacheWriter : MonoBehaviour
 
 	void WriteToFile(string Packet)
 	{
+		if ( FirstWrite && ClearOnFirstWrite )
+		{
+			ClearCache();
+			FirstWrite = false;
+		}
+		
 		var OpeningBrace = '{';
 		var ClosingBrace = '}';
 
@@ -234,6 +243,12 @@ public class PopRelayCacheWriter : MonoBehaviour
 
 	void WriteToFile(byte[] Packet)
 	{
+		if (FirstWrite && ClearOnFirstWrite)
+		{
+			ClearCache();
+			FirstWrite = false;
+		}
+
 		//	gr: should still have some json I think...
 		/*
 		var OpeningBrace = '{';

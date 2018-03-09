@@ -173,7 +173,9 @@ public class PopRelayCacheWriter : MonoBehaviour
 
 	void OnQueueChanged()
 	{
+#if UNITY_EDITOR
 		EditorUtility.SetDirty (this);
+#endif
 		/*
 		if ( ExecuteThread != null )
 			return;

@@ -32,7 +32,7 @@ public class PopRelayServer : MonoBehaviour
 
 
 	[Header("Dictates which port we listen to")]
-	public PopRelayClient.Role ListenRole = PopRelayClient.Role.God;
+	public PopRelayClient.Role ListenRole = PopRelayClient.Role.God2018;
 
 	//	we just open the god-client port, as we probably only want to listen out for messages from "gods"
 	public int Port

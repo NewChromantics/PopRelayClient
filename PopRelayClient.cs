@@ -72,7 +72,8 @@ public class PopRelayClient : MonoBehaviour
 
 	public enum Role
 	{
-		God = 8081,
+		God2017 = 8081,			//	now deprecated as vrserver (osx steamvr monitor) uses 8081
+		God = 55026,			
 		Observer = 8080,
 	};
 	
@@ -189,7 +190,7 @@ public class PopRelayClient : MonoBehaviour
 			};
 
 			//	gr: does this need to be a queued job?
-			//	gr: it does now, 2017 throws because of use of the events
+			//	gr: it does now, Unity2017 throws because of use of the events
 			NewSocket.OnMessage += (sender, e) => {
 
 				System.Action Handler = ()=>

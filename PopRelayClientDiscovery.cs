@@ -15,15 +15,19 @@ public class PopRelayClientDiscovery : MonoBehaviour {
 	public bool						DisableOnDiscovery = true;
 	public UnityEvent_Hostname		OnDiscoveredHost;
 
-	static string	BroadcastString = "whereisobserverserver";
+	static string	BroadcastForObserverString = "whereisobserverserver";
+	static string	BroadcastForGodString = "whoisserver";
 	static int		BroadcastPort = (int)PopRelayClient.Role.BroadcastPort;
+
+	string			BroadcastString	{	get{ return (RelayClient.ClientRole == PopRelayClient.Role.Observer) ? BroadcastForObserverString : BroadcastForGodString;	}}
+	PopRelayClient	RelayClient { get { return GetComponent<PopRelayClient>(); } }
 	UdpClient		Socket;
 	IPEndPoint		EndPoint;
-	bool			SentBroadcast = false;
 
 	[Range(0.5f,20.0f)]
 	public float	BroadcastEveryXSeconds = 5;
 	float			BroadcastCountdown = 0;
+	public bool		DebugBroadcast = true;
 
 	//	multithread, queue results :/
 	List<string>	FoundHosts = null;
@@ -32,9 +36,10 @@ public class PopRelayClientDiscovery : MonoBehaviour {
 	{
 		Socket = new UdpClient();
 		EndPoint = new IPEndPoint(IPAddress.Broadcast, BroadcastPort);
-		Socket.BeginReceive(new AsyncCallback(Receive), null);
+		 Socket.BeginReceive(new AsyncCallback(Receive), null);
 		FoundHosts = null;
 	}
+
 
 	void OnDisable()
 	{
@@ -81,12 +86,9 @@ public class PopRelayClientDiscovery : MonoBehaviour {
 
 	void Broadcast() 
 	{
-		//	still waiting for previous
-		if (SentBroadcast)
-			return;
-		
 		byte[] data = Encoding.ASCII.GetBytes(BroadcastString);
-		SentBroadcast = true;
+		if (DebugBroadcast)
+			Debug.Log("Sent broadcast");
 		Socket.Send(data, data.Length, EndPoint);
 	}
 
@@ -95,7 +97,6 @@ public class PopRelayClientDiscovery : MonoBehaviour {
 	{
 		//	terminate this session to get the data
 		byte[] received = Socket.EndReceive(Result, ref EndPoint);
-		SentBroadcast = false;
 		var Reply = Encoding.ASCII.GetString(received);
 
 		//	have to queue this for the mono thread in order to do anything useful

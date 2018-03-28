@@ -16,7 +16,7 @@ public class PopRelayClientDiscovery : MonoBehaviour {
 	public UnityEvent_Hostname		OnDiscoveredHost;
 
 	static string	BroadcastString = "whereisobserverserver";
-	static int		BroadcastPort = 8082;
+	static int		BroadcastPort = (int)PopRelayClient.Role.BroadcastPort;
 	UdpClient		Socket;
 	IPEndPoint		EndPoint;
 	bool			SentBroadcast = false;

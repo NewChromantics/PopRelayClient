@@ -73,8 +73,9 @@ public class PopRelayClient : MonoBehaviour
 	public enum Role
 	{
 		God2017 = 8081,			//	now deprecated as vrserver (osx steamvr monitor) uses 8081
-		God = 55026,			
+		God2018 = 8018,				
 		Observer = 8080,
+		BroadcastPort = 8082,		//	broadcast port
 	};
 	
 	WebSocket	Socket;

@@ -52,15 +52,19 @@ public class PopRelayServerDiscovery : MonoBehaviour {
 	{
 		if (Socket != null)
 		{
+			//	end recieve needs to not start another...
+			/*
+			var OldSocket
 			if (PendingRecieve != null)
 			{
 				IPEndPoint EndPoint = null;
 				byte[] ReceivedBytes = Socket.EndReceive(PendingRecieve, ref EndPoint);
 				PendingRecieve = null;
 			}
-
+	*/
 			Socket.Close();
-			Socket.Dispose();
+			PendingRecieve = null;
+			//Socket.Dispose();
 			Socket = null;
 		}
 
@@ -77,15 +81,23 @@ public class PopRelayServerDiscovery : MonoBehaviour {
 
 	void StartListening()
 	{
+		if ( Socket == null )
+			throw new System.Exception("StartListening failed, no socket");
+
 		PendingRecieve = Socket.BeginReceive(new AsyncCallback(Receive), null);
 	}
 
 	void Receive(System.IAsyncResult Result)
 	{
-		if ( Result != PendingRecieve )
+		//	socket has been closed
+		if (Socket == null)
 		{
-			Debug.Log("Got different AsyncResult...");
+			Debug.LogWarning("Receive aborted, no more socket");
+			return;
 		}
+
+		if ( Result != PendingRecieve )
+			Debug.Log("Got different AsyncResult...");
 		PendingRecieve = null;
 
 		//	terminate this session to get the data

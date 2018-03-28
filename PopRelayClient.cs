@@ -48,7 +48,10 @@ public class UnityEvent_PopMessageText : UnityEvent <PopMessageText> {}
 public class UnityEvent_Hostname : UnityEvent <string> {}
 
 [System.Serializable]
-public class UnityEvent_HostnameError : UnityEvent <string,string> {}
+public class UnityEvent_HostnameError : UnityEvent<string, string> { }
+
+[System.Serializable]
+public class UnityEvent_HostnameAndError : UnityEvent<string> { }
 
 
 public class PopRelayClient : MonoBehaviour
@@ -58,6 +61,7 @@ public class PopRelayClient : MonoBehaviour
 	public UnityEvent_Hostname			OnConnected;
 	[Header("Invoked to match failed initial connect")]
 	public UnityEvent_HostnameError		OnDisconnected;
+	public UnityEvent_HostnameAndError	OnDisconnectedOneString;
 
 	public UnityEvent_PopMessageBinary	OnMessageBinary;
 	public UnityEvent_PopMessageText	OnMessageText;
@@ -123,6 +127,15 @@ public class PopRelayClient : MonoBehaviour
 		Connect ();
 	}
 
+	void DoOnDisconnected(string Hostname,string Error)
+	{
+		OnDisconnected.Invoke(Hostname,Error);
+		var OneError = string.IsNullOrEmpty(Error) ? "<null>" : Error;
+		if (!string.IsNullOrEmpty(Hostname))
+			OneError += " (" + Hostname + ")";
+		OnDisconnectedOneString.Invoke(OneError);
+	}
+
 	//	gr: change this to throw on immediate error
 	void Connect()
 	{	
@@ -135,7 +148,7 @@ public class PopRelayClient : MonoBehaviour
 
 		var Host = CurrentHost;
 		if (Host == null) {
-			OnDisconnected.Invoke (null, "No hostname specified");
+			DoOnDisconnected (null, "No hostname specified");
 			return;
 		}
 
@@ -200,7 +213,7 @@ public class PopRelayClient : MonoBehaviour
 				Debug.LogWarning ("Unexpected non-null socket");
 				Socket = null;
 			}
-			OnDisconnected.Invoke (Host, e.Message);
+			DoOnDisconnected (Host, e.Message);
 		}
 	}
 
@@ -269,7 +282,7 @@ public class PopRelayClient : MonoBehaviour
 	void OnError(string Host,string Message,bool Close){
 		//SetStatus("Error: " + Message );
 		Debug.Log(Host + " error: " + Message );
-		OnDisconnected.Invoke (Host, Message);
+		DoOnDisconnected(Host, Message);
 
 		if (Close) {
 			if (Socket != null) {

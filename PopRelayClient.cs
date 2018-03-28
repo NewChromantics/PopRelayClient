@@ -81,6 +81,7 @@ public class PopRelayClient : MonoBehaviour
 	WebSocket	Socket;
 	bool		SocketConnecting = false;
 	bool		DebugUpdate = false;
+	public bool		IsConnected	{ get { return (Socket!=null); }}
 
 	[Header("This just dictates the port if none specified")]
 	public Role		ClientRole = Role.Observer;

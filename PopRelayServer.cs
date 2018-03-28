@@ -28,6 +28,32 @@ public class PopRelayServer : MonoBehaviour
 		protected override void OnOpen() { Parent.OnConnected(this); }
 	};
 
+	public string GetObserverAddress()
+	{
+		if (Socket == null)
+			return null;
+		if (ListenRole != PopRelayClient.Role.Observer)
+			return null;
+
+		var Address = Socket.Address.ToString();
+		Address += ":";
+		Address += Socket.Port;
+		return Address;
+	}
+
+	public string GetGodAddress()
+	{
+		if (Socket == null)
+			return null;
+		if (ListenRole != PopRelayClient.Role.God2018)
+			return null;
+
+		var Address = Socket.Address.ToString();
+		Address += ":";
+		Address += Socket.Port;
+		return Address;
+	}
+
 	WebSocketServer Socket;
 
 
@@ -62,7 +88,9 @@ public class PopRelayServer : MonoBehaviour
 
 		try
 		{
-			Socket = new WebSocketServer(Port);
+			//	we could use .any... but when we never know our address!
+			var LocalAddress = PopX.Net.GetLocalAddress();
+			Socket = new WebSocketServer(LocalAddress,Port);
 
 			//	bind to messages here...
 			WebSocketSharp.Func<ClientConnection> AllocService = () =>

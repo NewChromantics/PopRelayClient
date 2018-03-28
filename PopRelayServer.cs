@@ -80,6 +80,25 @@ public class PopRelayServer : MonoBehaviour
 		Close();
 	}
 
+	void SocketDebug(WebSocketSharp.LogData Data, string Message)
+	{
+		switch (Data.Level)
+		{
+			default:
+				Debug.Log(Message);
+				break;
+
+			case LogLevel.WARN:
+				Debug.LogWarning(Message);
+				break;
+
+			case LogLevel.ERROR:
+				Debug.LogError(Message);
+				break;
+		}
+				
+	}
+
 	void Listen()
 	{
 		//	already connected
@@ -92,12 +111,15 @@ public class PopRelayServer : MonoBehaviour
 			var LocalAddress = PopX.Net.GetLocalAddress();
 			Socket = new WebSocketServer(LocalAddress,Port);
 
+			Socket.Log.SetOutput(SocketDebug);
+
 			//	bind to messages here...
 			WebSocketSharp.Func<ClientConnection> AllocService = () =>
 			{
 				return new ClientConnection(this);
 			};
-			Socket.AddWebSocketService<ClientConnection>(null, AllocService);
+			//	code looks like this should throw with null, but it doesnt...
+			Socket.AddWebSocketService<ClientConnection>("/", AllocService);
 
 			Socket.Start();
 			if (!Socket.IsListening)

@@ -14,6 +14,8 @@ using UnityEngine.Events;
 //		consider renaming to... PopRelaySpy, PopRelayTrojan ?
 public class PopRelayServer : MonoBehaviour
 {
+	public UnityEvent_JsonAndDataAndEncoding OnDecodedPacket;
+
 	class ClientConnection : WebSocketService
 	{
 		PopRelayServer Parent;
@@ -162,7 +164,8 @@ public class PopRelayServer : MonoBehaviour
 			case Opcode.TEXT:
 				{
 					var Message = new PopMessageText(e.Data);
-					Debug.Log("Client message " + Message.Data);
+					OnMessage(Message);
+					//Debug.Log("Client message " + Message.Data);
 					return;
 				}
 			case Opcode.BINARY:
@@ -180,4 +183,16 @@ public class PopRelayServer : MonoBehaviour
 	{
 		Debug.Log("Client connected");
 	}
+
+	void OnMessage(PopMessageText Packet)
+	{
+		string Json;
+		byte[] Data;
+		PopRelayEncoding Encoding;
+
+		PopRelayDecoder.DecodePacket( Packet, out Json, out Data, out Encoding );
+
+		OnDecodedPacket.Invoke(Json, Data, Encoding);
+	}
+
 }

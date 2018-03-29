@@ -16,7 +16,7 @@ public class PopRelayServer : MonoBehaviour
 {
 	public UnityEvent_JsonAndDataAndEncoding OnDecodedPacket;
 
-	class ClientConnection : WebSocketService
+	class ClientConnection : WebSocketBehavior
 	{
 		PopRelayServer Parent;
 		public ClientConnection(PopRelayServer Parent)
@@ -90,11 +90,11 @@ public class PopRelayServer : MonoBehaviour
 				Debug.Log(Message);
 				break;
 
-			case LogLevel.WARN:
+			case LogLevel.Warn:
 				Debug.LogWarning(Message);
 				break;
 
-			case LogLevel.ERROR:
+			case LogLevel.Error:
 				Debug.LogError(Message);
 				break;
 		}
@@ -111,17 +111,20 @@ public class PopRelayServer : MonoBehaviour
 		{
 			//	we could use .any... but when we never know our address!
 			var LocalAddress = PopX.Net.GetLocalAddress();
-			Socket = new WebSocketServer(LocalAddress,Port);
+			Socket = new WebSocketServer(LocalAddress, Port);
 
-			Socket.Log.SetOutput(SocketDebug);
+			//	reuse address doesn't help.
+			//	Socket.ReuseAddress = true;
+			Socket.Log.Output = SocketDebug;
 
 			//	bind to messages here...
-			WebSocketSharp.Func<ClientConnection> AllocService = () =>
+			System.Func<ClientConnection> AllocService = () =>
 			{
 				return new ClientConnection(this);
 			};
 			//	code looks like this should throw with null, but it doesnt...
 			Socket.AddWebSocketService<ClientConnection>("/", AllocService);
+
 
 			Socket.Start();
 			if (!Socket.IsListening)
@@ -159,23 +162,22 @@ public class PopRelayServer : MonoBehaviour
 
 	void OnMessage(ClientConnection Client, MessageEventArgs e)
 	{
-		switch (e.Type)
+		if ( e.IsText )
 		{
-			case Opcode.TEXT:
-				{
-					var Message = new PopMessageText(e.Data);
-					OnMessage(Message);
-					//Debug.Log("Client message " + Message.Data);
-					return;
-				}
-			case Opcode.BINARY:
-				{
-					var Message = new PopMessageBinary(e.RawData);
-					Debug.Log("Client message x" + Message.Data.Length + " bytes");
-					return;
-				}
-			default:
-				throw new System.Exception("Unhandled client message type " + e.Type);
+			var Message = new PopMessageText(e.Data);
+			OnMessage(Message);
+			//Debug.Log("Client message " + Message.Data);
+			return;
+		}
+		else if ( e.IsBinary )
+		{
+			var Message = new PopMessageBinary(e.RawData);
+			Debug.Log("Client message x" + Message.Data.Length + " bytes");
+			return;
+		}
+		else
+		{
+			throw new System.Exception("Unhandled client message");
 		}
 	}
 

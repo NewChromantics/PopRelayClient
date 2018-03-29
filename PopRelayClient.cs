@@ -196,12 +196,16 @@ public class PopRelayClient : MonoBehaviour
 
 				System.Action Handler = ()=>
 				{
-					if ( e.Type == Opcode.TEXT )
+					if ( e.IsText )
 						OnTextMessage( e.Data );
-					else if ( e.Type == Opcode.BINARY )
+					else if ( e.IsBinary )
 						OnBinaryMessage( e.RawData );
+					else if ( e.IsPing )
+					{
+						
+					}
 					else
-						OnError( Host, "Unknown opcode " + e.Type, false );
+						OnError( Host, "Unknown websocket operation (not text,binary,ping) ", false );
 				};
 				QueueJob(Handler);
 			};
